@@ -231,25 +231,25 @@ Trigger phải có: `SET NEW.branch_code = 'SG';`
 
 ### SQL Template (`chillphones_branch_template.sql`)
 
-Template sử dụng placeholder `___BRANCH__` ở các vị trí:
+Template sử dụng placeholder `{{BRANCH}}` ở các vị trí:
 
 1. **Database name:**
 ```sql
-CREATE DATABASE IF NOT EXISTS chillphones_branch___BRANCH__
-USE chillphones_branch___BRANCH__;
+CREATE DATABASE IF NOT EXISTS chillphones_branch_{{BRANCH}}
+USE chillphones_branch_{{BRANCH}};
 ```
 
 2. **Triggers:**
 ```sql
 CREATE TRIGGER tg_bpo_force_branch_ins ... BEGIN
-  SET NEW.branch_code = '___BRANCH__';
+  SET NEW.branch_code = '{{BRANCH}}';
 END
 ```
 
 3. **Views:**
 ```sql
 CREATE VIEW v_pos_catalog AS 
-SELECT ... WHERE i.branch_code = '___BRANCH__'
+SELECT ... WHERE i.branch_code = '{{BRANCH}}'
 ```
 
 ### Script Flow
@@ -264,7 +264,7 @@ SELECT ... WHERE i.branch_code = '___BRANCH__'
            ├─► Copy to branch directory (/var/www/sg-cps/)
            │
            ├─► Run import_branch_schema.sh SG
-           │   └─► sed 's/___BRANCH__/SG/g' | mysql
+           │   └─► sed 's/{{BRANCH}}/SG/g' | mysql
            │       └─► Create chillphones_branch_SG
            │           └─► Import tables, triggers, views with SG
            │

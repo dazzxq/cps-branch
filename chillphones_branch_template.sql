@@ -17,16 +17,16 @@ SET time_zone = "+00:00";
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
 /*!40101 SET NAMES utf8mb4 */;
 
-CREATE DATABASE IF NOT EXISTS chillphones_branch___BRANCH__
+CREATE DATABASE IF NOT EXISTS chillphones_branch_{{BRANCH}}
     CHARACTER SET utf8mb4
     COLLATE utf8mb4_unicode_ci;
 
-GRANT ALL PRIVILEGES ON chillphones_branch___BRANCH__.* TO 'cps_admin'@'localhost';
+GRANT ALL PRIVILEGES ON chillphones_branch_{{BRANCH}}.* TO 'cps_admin'@'localhost';
 FLUSH PRIVILEGES;
 
-USE chillphones_branch___BRANCH__;
+USE chillphones_branch_{{BRANCH}};
 --
--- Database: `chillphones_branch___BRANCH__`
+-- Database: `chillphones_branch_{{BRANCH}}`
 --
 
 -- --------------------------------------------------------
@@ -62,13 +62,13 @@ CREATE TABLE `branch_price_override` (
 --
 DELIMITER $$
 CREATE TRIGGER `tg_bpo_force_branch_ins` BEFORE INSERT ON `branch_price_override` FOR EACH ROW BEGIN
-  SET NEW.branch_code = '___BRANCH__';
+  SET NEW.branch_code = '{{BRANCH}}';
 END
 $$
 DELIMITER ;
 DELIMITER $$
 CREATE TRIGGER `tg_bpo_force_branch_upd` BEFORE UPDATE ON `branch_price_override` FOR EACH ROW BEGIN
-  SET NEW.branch_code = '___BRANCH__';
+  SET NEW.branch_code = '{{BRANCH}}';
 END
 $$
 DELIMITER ;
@@ -122,7 +122,7 @@ CREATE TABLE `employee_replica` (
 --
 
 INSERT INTO `employee_replica` (`id`, `name`, `email`, `password_hash`, `role`, `branch_code`, `enabled`, `updated_at`) VALUES
-(1, 'CPS Admin', 'cps_admin@duyet.dev', '$2y$10$68.UbUSy3UrTg2Av4hlUcuSbt1K2mn3ik/nJZu2CEtUeWISy3fNce', 'ADMIN', '___BRANCH__', 1, CURRENT_TIMESTAMP)
+(1, 'CPS Admin', 'cps_admin@duyet.dev', '$2y$10$68.UbUSy3UrTg2Av4hlUcuSbt1K2mn3ik/nJZu2CEtUeWISy3fNce', 'ADMIN', '{{BRANCH}}', 1, CURRENT_TIMESTAMP)
 ON DUPLICATE KEY UPDATE 
   `name` = VALUES(`name`),
   `email` = VALUES(`email`),
@@ -150,13 +150,13 @@ CREATE TABLE `inventory` (
 --
 DELIMITER $$
 CREATE TRIGGER `tg_inventory_force_branch` BEFORE INSERT ON `inventory` FOR EACH ROW BEGIN
-  SET NEW.branch_code = '___BRANCH__';
+  SET NEW.branch_code = '{{BRANCH}}';
 END
 $$
 DELIMITER ;
 DELIMITER $$
 CREATE TRIGGER `tg_inventory_force_branch_upd` BEFORE UPDATE ON `inventory` FOR EACH ROW BEGIN
-  SET NEW.branch_code = '___BRANCH__';
+  SET NEW.branch_code = '{{BRANCH}}';
 END
 $$
 DELIMITER ;
@@ -187,7 +187,7 @@ CREATE TRIGGER `tg_outbox_after_order` AFTER INSERT ON `orders` FOR EACH ROW BEG
     'ORDER_CREATED',
     JSON_OBJECT(
       'order_code', NEW.order_code,
-      'branch_code', '___BRANCH__',
+      'branch_code', '{{BRANCH}}',
       'total', NEW.total,
       'created_at', NEW.created_at
     ),
@@ -314,7 +314,7 @@ CREATE TABLE `v_pos_catalog` (
 --
 DROP TABLE IF EXISTS `v_inventory_overview`;
 
-CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v_inventory_overview`  AS SELECT `pr`.`id` AS `product_id`, `pr`.`sku` AS `sku`, `pr`.`name` AS `name`, `pr`.`brand_name` AS `brand_name`, `pr`.`price` AS `price`, `i`.`qty` AS `qty`, `i`.`reserved` AS `reserved`, `i`.`qty`- `i`.`reserved` AS `available` FROM (`products_replica` `pr` left join `inventory` `i` on(`i`.`product_id` = `pr`.`id` and `i`.`branch_code` = '___BRANCH__')) ;
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v_inventory_overview`  AS SELECT `pr`.`id` AS `product_id`, `pr`.`sku` AS `sku`, `pr`.`name` AS `name`, `pr`.`brand_name` AS `brand_name`, `pr`.`price` AS `price`, `i`.`qty` AS `qty`, `i`.`reserved` AS `reserved`, `i`.`qty`- `i`.`reserved` AS `available` FROM (`products_replica` `pr` left join `inventory` `i` on(`i`.`product_id` = `pr`.`id` and `i`.`branch_code` = '{{BRANCH}}')) ;
 
 -- --------------------------------------------------------
 
@@ -323,7 +323,7 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 --
 DROP TABLE IF EXISTS `v_pos_catalog`;
 
-CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v_pos_catalog`  AS SELECT `pr`.`id` AS `product_id`, `pr`.`sku` AS `sku`, `pr`.`name` AS `name`, `pr`.`brand_name` AS `brand_name`, `pr`.`status` AS `status`, `pr`.`price` AS `central_price`, `pr`.`promo_price` AS `central_promo_price`, `i`.`qty` AS `qty`, `i`.`reserved` AS `reserved`, coalesce(case when `bpo`.`product_id` is not null and (`bpo`.`starts_at` is null or `bpo`.`starts_at` <= current_timestamp()) and (`bpo`.`ends_at` is null or `bpo`.`ends_at` >= current_timestamp()) then `bpo`.`promo_price` end,`pr`.`promo_price`,case when `bpo`.`product_id` is not null and (`bpo`.`starts_at` is null or `bpo`.`starts_at` <= current_timestamp()) and (`bpo`.`ends_at` is null or `bpo`.`ends_at` >= current_timestamp()) then `bpo`.`price` end,`pr`.`price`) AS `effective_price` FROM ((`products_replica` `pr` left join `inventory` `i` on(`i`.`product_id` = `pr`.`id` and `i`.`branch_code` = '___BRANCH__')) left join `branch_price_override` `bpo` on(`bpo`.`product_id` = `pr`.`id` and `bpo`.`branch_code` = '___BRANCH__')) ;
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v_pos_catalog`  AS SELECT `pr`.`id` AS `product_id`, `pr`.`sku` AS `sku`, `pr`.`name` AS `name`, `pr`.`brand_name` AS `brand_name`, `pr`.`status` AS `status`, `pr`.`price` AS `central_price`, `pr`.`promo_price` AS `central_promo_price`, `i`.`qty` AS `qty`, `i`.`reserved` AS `reserved`, coalesce(case when `bpo`.`product_id` is not null and (`bpo`.`starts_at` is null or `bpo`.`starts_at` <= current_timestamp()) and (`bpo`.`ends_at` is null or `bpo`.`ends_at` >= current_timestamp()) then `bpo`.`promo_price` end,`pr`.`promo_price`,case when `bpo`.`product_id` is not null and (`bpo`.`starts_at` is null or `bpo`.`starts_at` <= current_timestamp()) and (`bpo`.`ends_at` is null or `bpo`.`ends_at` >= current_timestamp()) then `bpo`.`price` end,`pr`.`price`) AS `effective_price` FROM ((`products_replica` `pr` left join `inventory` `i` on(`i`.`product_id` = `pr`.`id` and `i`.`branch_code` = '{{BRANCH}}')) left join `branch_price_override` `bpo` on(`bpo`.`product_id` = `pr`.`id` and `bpo`.`branch_code` = '{{BRANCH}}')) ;
 
 --
 -- Indexes for dumped tables

@@ -57,12 +57,12 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 echo ""
-echo "➡️  Replacing placeholder ___BRANCH__ with $BRANCH..."
+echo "➡️  Replacing placeholder {{BRANCH}} with $BRANCH..."
 echo "➡️  Importing schema to database: $DB_NAME..."
 echo ""
 
-# Replace ___BRANCH__ placeholder with actual branch code and pipe to mysql
-sed "s/___BRANCH__/${BRANCH}/g" "$SCHEMA_TEMPLATE" | mysql -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" 2>&1
+# Replace {{BRANCH}} placeholder with actual branch code and pipe to mysql
+sed "s/{{BRANCH}}/${BRANCH}/g" "$SCHEMA_TEMPLATE" | mysql -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" 2>&1
 
 # Check if import was successful
 if [ $? -eq 0 ]; then
