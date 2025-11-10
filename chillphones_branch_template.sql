@@ -17,13 +17,6 @@ SET time_zone = "+00:00";
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
 /*!40101 SET NAMES utf8mb4 */;
 
-CREATE DATABASE IF NOT EXISTS chillphones_branch_{{BRANCH}}
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
-
-GRANT ALL PRIVILEGES ON chillphones_branch_{{BRANCH}}.* TO 'cps_admin'@'localhost';
-FLUSH PRIVILEGES;
-
 USE chillphones_branch_{{BRANCH}};
 --
 -- Database: `chillphones_branch_{{BRANCH}}`
