@@ -30,6 +30,170 @@ USE chillphones_branch_{{BRANCH}};
 --
 
 -- --------------------------------------------------------
+--
+-- Stored Procedures
+--
+-- --------------------------------------------------------
+
+DELIMITER $$
+--
+-- Procedure: sp_create_order (ACID Transaction for Order Creation)
+--
+DROP PROCEDURE IF EXISTS `sp_create_order`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_create_order` (
+    IN `p_order_code` VARCHAR(40), 
+    IN `p_branch_code` CHAR(5), 
+    IN `p_customer_name` VARCHAR(255), 
+    IN `p_customer_phone` VARCHAR(20), 
+    IN `p_customer_email` VARCHAR(255), 
+    IN `p_customer_address` TEXT, 
+    IN `p_order_note` TEXT, 
+    IN `p_items_json` JSON, 
+    IN `p_total_amount` INT
+) sp:BEGIN
+    DECLARE v_order_id BIGINT;
+    DECLARE v_item_count INT DEFAULT 0;
+    DECLARE v_idx INT DEFAULT 0;
+    DECLARE v_product_id BIGINT;
+    DECLARE v_qty INT;
+    DECLARE v_price INT;
+    DECLARE v_stock INT;
+    DECLARE v_product_name VARCHAR(255);
+    
+    -- Handler must be at the beginning of BEGIN block
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT 'ERROR' AS status, 'Transaction failed - check stock or data constraints' AS message;
+    END;
+    
+    -- Set strict mode to ensure warnings become errors
+    SET SESSION sql_mode = 'STRICT_ALL_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
+    
+    -- IDEMPOTENCY CHECK
+    IF EXISTS (SELECT 1 FROM orders WHERE order_code = p_order_code) THEN
+        SELECT 'DUPLICATE' AS status, p_order_code AS order_code, id AS order_id 
+        FROM orders WHERE order_code = p_order_code;
+        LEAVE sp;
+    END IF;
+    
+    -- START TRANSACTION
+    START TRANSACTION;
+    
+    -- 1. CREATE ORDER
+    INSERT INTO orders(order_code, branch_code, total, status, json_ext, created_at)
+    VALUES (
+        p_order_code, 
+        p_branch_code, 
+        p_total_amount, 
+        'NEW', 
+        JSON_OBJECT(
+            'name', p_customer_name, 
+            'phone', p_customer_phone, 
+            'email', p_customer_email, 
+            'address', p_customer_address, 
+            'note', p_order_note, 
+            'source', 'storefront', 
+            'created_at', NOW()
+        ),
+        NOW()
+    );
+    SET v_order_id = LAST_INSERT_ID();
+    
+    -- 2. PROCESS ITEMS (ATOMICITY + ISOLATION)
+    SET v_item_count = JSON_LENGTH(p_items_json);
+    WHILE v_idx < v_item_count DO
+        -- Extract item data from JSON
+        SET v_product_id = JSON_UNQUOTE(JSON_EXTRACT(p_items_json, CONCAT('$[', v_idx, '].product_id')));
+        SET v_qty = JSON_UNQUOTE(JSON_EXTRACT(p_items_json, CONCAT('$[', v_idx, '].qty')));
+        SET v_price = JSON_UNQUOTE(JSON_EXTRACT(p_items_json, CONCAT('$[', v_idx, '].price')));
+        
+        -- 2.1. CHECK STOCK (ISOLATION - FOR UPDATE LOCK)
+        SELECT inv.qty, pr.name INTO v_stock, v_product_name
+        FROM branch_inventory inv 
+        LEFT JOIN products_replica pr ON pr.id = inv.product_id
+        WHERE inv.product_id = v_product_id 
+        FOR UPDATE;
+        
+        -- Validate stock exists
+        IF v_stock IS NULL THEN 
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'PRODUCT_NOT_IN_INVENTORY'; 
+        END IF;
+        
+        -- Check sufficient stock
+        IF v_stock < v_qty THEN
+            SET @err_detail = CONCAT(
+                'INSUFFICIENT_STOCK: Product "', 
+                COALESCE(v_product_name, v_product_id), 
+                '" only has ', v_stock, 
+                ' in stock, but ', v_qty, ' requested'
+            );
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = @err_detail;
+        END IF;
+        
+        -- 2.2. CREATE ORDER ITEM
+        INSERT INTO order_item(order_id, product_id, qty, unit_price)
+        VALUES (v_order_id, v_product_id, v_qty, v_price);
+        
+        -- 2.3. DEDUCT STOCK (ATOMICITY)
+        UPDATE branch_inventory
+        SET qty = qty - v_qty, updated_at = NOW()
+        WHERE product_id = v_product_id;
+        
+        SET v_idx = v_idx + 1;
+    END WHILE;
+    
+    -- 3. UPDATE ORDER STATUS TO PAID
+    UPDATE orders
+    SET status = 'PAID'
+    WHERE id = v_order_id;
+    
+    -- 4. COMMIT (DURABILITY)
+    COMMIT;
+    
+    -- RETURN SUCCESS
+    SELECT 
+        'SUCCESS' AS status,
+        p_order_code AS order_code,
+        v_order_id AS order_id,
+        'Order created successfully (Real-time sync mode)' AS message;
+END$$
+
+--
+-- Procedure: sp_set_stock (Set Branch Stock)
+--
+DROP PROCEDURE IF EXISTS `sp_set_stock`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_set_stock` (
+    IN `p_product_id` BIGINT, 
+    IN `p_qty` INT
+) BEGIN
+    START TRANSACTION;
+    
+    -- Validate input
+    IF p_qty < 0 THEN
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'INVALID_QTY: Stock cannot be negative';
+    END IF;
+    
+    -- Upsert stock
+    INSERT INTO branch_inventory(product_id, qty, updated_at)
+    VALUES (p_product_id, p_qty, NOW())
+    ON DUPLICATE KEY UPDATE 
+        qty = VALUES(qty),
+        updated_at = VALUES(updated_at);
+    
+    COMMIT;
+    
+    SELECT 
+        'SUCCESS' AS status,
+        p_product_id AS product_id,
+        p_qty AS qty,
+        'Stock updated' AS message;
+END$$
+
+DELIMITER ;
+
+-- --------------------------------------------------------
 
 --
 -- Table structure for table `branch_inventory`
