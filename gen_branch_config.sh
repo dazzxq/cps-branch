@@ -20,11 +20,14 @@ else
     BRANCH=$(basename "$PWD" | tr '[:lower:]' '[:upper:]')
 fi
 
-# Get API key from argument or use default
+# Get Central API key from argument or use default
+# Note: This is the CENTRAL API KEY (shared by all branches)
+# NOT the branch-specific API key from branch table
 if [ -n "$2" ]; then
     API_KEY="$2"
 else
-    API_KEY="dqIwQOnB9nlijX4avTx4z78jFhMCQVeCcv2z9Edu"
+    # Use default Central API key (same for all branches)
+    API_KEY="5bvkQ0k0LxiqzmlMF2b1CRHFk8ToEZCjuC0bsTr5"
 fi
 
 echo "============================================"
@@ -32,7 +35,7 @@ echo "Branch Config Generator"
 echo "============================================"
 echo "Branch Code: $BRANCH"
 echo "Database: chillphones_branch_$BRANCH"
-echo "API Key: ${API_KEY:0:10}..."
+echo "Central API Key: ${API_KEY:0:10}... (shared key for all branches)"
 echo "============================================"
 echo ""
 
@@ -78,7 +81,7 @@ if [ $? -eq 0 ]; then
     echo "  1. Review and customize config.php if needed"
     echo "  2. Update DB_PASSWORD if using different credentials"
     echo "  3. Update APP_URL with the correct domain"
-    echo "  4. Verify CENTRAL_API_KEY is correct for this branch"
+    echo "  4. ✅ CENTRAL_API_KEY is set (shared key for all branches)"
     echo ""
 else
     echo "❌ ERROR: Failed to generate config.php"
