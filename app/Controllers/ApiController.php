@@ -21,11 +21,27 @@ class ApiController {
             $apiKey = $_SERVER['HTTP_X_API_KEY'] ?? '';
         }
         
-        // For now, just check it matches our config
-        $expectedKey = $this->env['CENTRAL_API_KEY'] ?? '';
-        if ($apiKey !== $expectedKey) {
+        // Accept 2 loại keys:
+        // 1. CENTRAL_API_KEY - Dùng khi branch gọi lên Central (không dùng ở đây, nhưng keep for reference)
+        // 2. BRANCH_API_KEY - Dùng khi Central push data xuống branch (check ở đây!)
+        $validKeys = [
+            $this->env['CENTRAL_API_KEY'] ?? '',  // Central shared key (backward compatible)
+            $this->env['BRANCH_API_KEY'] ?? ''    // Branch-specific key (for Central → Branch)
+        ];
+        
+        // Remove empty keys
+        $validKeys = array_filter($validKeys);
+        
+        if (!in_array($apiKey, $validKeys)) {
             http_response_code(403);
-            echo json_encode(['success'=>false,'error'=>'Forbidden']);
+            echo json_encode([
+                'success'=>false,
+                'error'=>'Forbidden',
+                'debug' => [
+                    'received_key' => substr($apiKey, 0, 10) . '...',
+                    'valid_keys_count' => count($validKeys)
+                ]
+            ]);
             exit();
         }
     }
