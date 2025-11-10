@@ -8,7 +8,7 @@
 #   ./import_branch_schema.sh HN
 #   ./import_branch_schema.sh SG
 #
-# If no BRANCH_CODE provided, auto-detect from current directory name
+# If no BRANCH_CODE provided, auto-detect from directory name
 # /var/www/hn -> HN
 # /var/www/sg -> SG
 # ============================================
@@ -49,7 +49,7 @@ if [ ! -f "$SCHEMA_TEMPLATE" ]; then
 fi
 
 # Confirm before proceeding
-read -p "⚠️  This will CREATE/REPLACE database '$DB_NAME'. Continue? (y/N): " -n 1 -r
+read -p "⚠️  This will APPLY schema to database '$DB_NAME'. Continue? (y/N): " -n 1 -r
 echo ""
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "❌ Import cancelled."
@@ -58,19 +58,42 @@ fi
 
 echo ""
 echo "➡️  Replacing placeholder {{BRANCH}} with $BRANCH..."
+echo ""
+
+# Tạo file tạm để xử lý SQL
+TEMP_SQL_FILE=$(mktemp)
+
+# 1) Thay {{BRANCH}} -> BRANCH thật
+sed "s/{{BRANCH}}/${BRANCH}/g" "$SCHEMA_TEMPLATE" > "$TEMP_SQL_FILE"
+
+# 2) Làm sạch SQL:
+#    - Bỏ CREATE DATABASE (DB đã được tạo ngoài bằng root)
+#    - Bỏ GRANT / FLUSH PRIVILEGES (quyền đã được cấp ngoài bằng root)
+#    - Bỏ DEFINER=`root`@`localhost` (để routine dùng DEFINER = cps_admin)
+sed -i -E \
+    -e '/^CREATE DATABASE /d' \
+    -e '/^GRANT /d' \
+    -e '/^FLUSH PRIVILEGES/d' \
+    -e 's/DEFINER=`[^`]+`@`[^`]+`\s+//g' \
+    "$TEMP_SQL_FILE"
+
 echo "➡️  Importing schema to database: $DB_NAME..."
 echo ""
 
-# Replace {{BRANCH}} placeholder with actual branch code and pipe to mysql
-sed "s/{{BRANCH}}/${BRANCH}/g" "$SCHEMA_TEMPLATE" | mysql -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" 2>&1
+# 3) Import vào đúng database
+mysql -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASS" "$DB_NAME" < "$TEMP_SQL_FILE" 2>&1
+STATUS=$?
+
+# Xoá file tạm
+rm -f "$TEMP_SQL_FILE"
 
 # Check if import was successful
-if [ $? -eq 0 ]; then
+if [ $STATUS -eq 0 ]; then
     echo ""
     echo "✅ SUCCESS: Schema imported successfully for database '$DB_NAME'"
     echo ""
     echo "📋 Summary:"
-    echo "  ✅ Database: $DB_NAME created"
+    echo "  ✅ Database: $DB_NAME (schema applied)"
     echo "  ✅ Tables: Created with branch code '$BRANCH'"
     echo "  ✅ Stored Procedures: sp_create_order, sp_set_stock"
     echo "  ✅ Triggers: Configured for branch '$BRANCH'"
@@ -78,8 +101,8 @@ if [ $? -eq 0 ]; then
     echo "  ✅ Admin Account: cps_admin@duyet.dev (password: admin123)"
     echo ""
     echo "Next steps:"
-    echo "  1. Verify database: mysql -u $MYSQL_USER -p123456789 -e 'SHOW TABLES FROM $DB_NAME;'"
-    echo "  2. Verify procedures: mysql -u $MYSQL_USER -p123456789 -e 'SHOW PROCEDURE STATUS WHERE Db=\"$DB_NAME\";'"
+    echo "  1. Verify database: mysql -u $MYSQL_USER -p$MYSQL_PASS -e 'SHOW TABLES FROM $DB_NAME;'"
+    echo "  2. Verify procedures: mysql -u $MYSQL_USER -p$MYSQL_PASS -e 'SHOW PROCEDURE STATUS WHERE Db=\"$DB_NAME\";'"
     echo "  3. Generate config: ./gen_branch_config.sh $BRANCH"
     echo "  4. Test login: http://localhost/login (cps_admin@duyet.dev / admin123)"
     echo ""
@@ -90,4 +113,3 @@ else
     echo ""
     exit 1
 fi
-
