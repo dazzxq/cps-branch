@@ -7,11 +7,16 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-echo "=== Testing Order API ===\n\n";
+// Load config
+$config = require __DIR__ . '/config.php';
+$branchCode = $config['APP_BRANCH_CODE'];
+
+echo "=== Testing Order API ===\n";
+echo "Branch: {$branchCode}\n\n";
 
 // Test data
 $testOrder = [
-    'branch_code' => 'HN',
+    'branch_code' => $branchCode,
     'customer_name' => 'Test User',
     'customer_phone' => '0123456789',
     'customer_email' => 'test@example.com',

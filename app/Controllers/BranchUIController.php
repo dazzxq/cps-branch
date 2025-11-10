@@ -76,10 +76,11 @@ class BranchUIController {
             $promo = isset($input['promo_price']) && $input['promo_price'] !== '' ? (int)$input['promo_price'] : null;
             $starts = !empty($input['starts_at']) ? $input['starts_at'] : null;
             $ends   = !empty($input['ends_at']) ? $input['ends_at'] : null;
-            // Upsert into branch_price_override (trigger will set branch_code='HN')
+            // Upsert into branch_price_override (using branch_code from config)
+            $branchCode = $this->env['APP_BRANCH_CODE'];
             $sql = "INSERT INTO branch_price_override (product_id, branch_code, price, promo_price, starts_at, ends_at) VALUES (?,?, ?, ?, ?, ?)
                     ON DUPLICATE KEY UPDATE price=VALUES(price), promo_price=VALUES(promo_price), starts_at=VALUES(starts_at), ends_at=VALUES(ends_at)";
-            $this->db->execute($sql, [$id, 'HN', $price, $promo, $starts, $ends]);
+            $this->db->execute($sql, [$id, $branchCode, $price, $promo, $starts, $ends]);
             echo json_encode(['success'=>true]);
         } catch(Exception $e){ http_response_code(400); echo json_encode(['success'=>false,'error'=>$e->getMessage()]); }
     }
@@ -92,9 +93,10 @@ class BranchUIController {
             if (!is_array($input)) throw new Exception('Invalid JSON');
             $qty = isset($input['qty']) ? (int)$input['qty'] : 0;
             $reserved = isset($input['reserved']) ? (int)$input['reserved'] : 0;
+            $branchCode = $this->env['APP_BRANCH_CODE'];
             $sql = "INSERT INTO inventory (product_id, branch_code, qty, reserved) VALUES (?,?,?,?)
                     ON DUPLICATE KEY UPDATE qty=VALUES(qty), reserved=VALUES(reserved)";
-            $this->db->execute($sql, [$id, 'HN', $qty, $reserved]);
+            $this->db->execute($sql, [$id, $branchCode, $qty, $reserved]);
             echo json_encode(['success'=>true]);
         } catch(Exception $e){ http_response_code(400); echo json_encode(['success'=>false,'error'=>$e->getMessage()]); }
     }

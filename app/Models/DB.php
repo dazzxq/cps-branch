@@ -5,12 +5,17 @@ class DB {
     private PDO $pdo;
     
     private function __construct(array $env = []){
-        // Hardcoded credentials per user request (ensure this file is private to the branch host)
-        $host = '127.0.0.1';
-        $port = '3306';
-        $dbname = 'chillphones_branch_HN';
-        $user = 'root';
-        $pass = 'AlphabetGoogleX0!';
+        // Load config from config.php if not provided
+        if (empty($env)) {
+            $env = require __DIR__ . '/../../config.php';
+        }
+        
+        // Use credentials from config
+        $host = $env['DB_HOST'] ?? '127.0.0.1';
+        $port = $env['DB_PORT'] ?? '3306';
+        $dbname = $env['DB_DATABASE'] ?? 'chillphones_branch_HN';
+        $user = $env['DB_USERNAME'] ?? 'root';
+        $pass = $env['DB_PASSWORD'] ?? '';
         $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4', $host, $port, $dbname);
         try {
             $this->pdo=new PDO($dsn,$user,$pass,[
